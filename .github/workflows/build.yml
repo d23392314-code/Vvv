@@ -1,0 +1,53 @@
+name: Build DEWZX VOICE AI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Arduino CLI
+        uses: arduino/setup-arduino-cli@v1
+
+      - name: Configure Arduino CLI
+        run: |
+          arduino-cli config init
+          arduino-cli config add board_manager.additional_urls \
+            https://espressif.github.io/arduino-esp32/package_esp32_index.json
+
+      - name: Install ESP32 Arduino core
+        run: |
+          arduino-cli core update-index
+          arduino-cli core install esp32:esp32@3.0.7
+
+      - name: Install required libraries
+        run: |
+          arduino-cli lib install "Adafruit ST7789@1.11.0"
+          arduino-cli lib install "Adafruit GFX Library@1.11.9"
+          arduino-cli lib install "ArduinoJson@6.21.5"
+
+      - name: Compile firmware
+        run: |
+          arduino-cli compile \
+            --fqbn "esp32:esp32:esp32s3:CDCOnBoot=cdc,FlashSize=8M,PartitionScheme=huge_app,PSRAM=opi,CPUFreq=240,DebugLevel=none" \
+            --output-dir ./build \
+            --warnings default \
+            DEWZX_VOICE_AI/
+
+      - name: Upload firmware as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: DEWZX-firmware-${{ github.sha }}
+          path: |
+            build/*.bin
+            build/*.elf
+          retention-days: 30
