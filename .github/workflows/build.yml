@@ -1,53 +1,42 @@
-name: Build DEWZX VOICE AI
+# Simpan sebagai: .github/workflows/build.yml   (di repo GitHub kamu)
+# Struktur repo:   DEWZX_VOICE_AI/DEWZX_VOICE_AI.ino   (nama folder = nama file .ino)
+name: Build DEWZX
 
 on:
   push:
-    branches: [ main, master ]
-  pull_request:
-    branches: [ main, master ]
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Arduino CLI
-        uses: arduino/setup-arduino-cli@v1
+      - uses: arduino/setup-arduino-cli@v2
 
-      - name: Configure Arduino CLI
+      - name: Install core ESP32 + library
         run: |
           arduino-cli config init
-          arduino-cli config add board_manager.additional_urls \
-            https://espressif.github.io/arduino-esp32/package_esp32_index.json
-
-      - name: Install ESP32 Arduino core
-        run: |
+          arduino-cli config set board_manager.additional_urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
           arduino-cli core update-index
-          arduino-cli core install esp32:esp32@3.0.7
+          arduino-cli core install esp32:esp32@3.2.0
+          arduino-cli lib install "GFX Library for Arduino"
+          arduino-cli lib install "ArduinoJson"
 
-      - name: Install required libraries
-        run: |
-          arduino-cli lib install "Adafruit ST7735 and ST7789 Library"
-          arduino-cli lib install "Adafruit GFX Library@1.11.9"
-          arduino-cli lib install "ArduinoJson@6.21.5"
+      - name: Daftar opsi board (untuk debug)
+        run: arduino-cli board details -b esp32:esp32:esp32s3 | grep -iE "PartitionScheme|PSRAM|FlashSize" || true
 
-      - name: Compile firmware
+      # Board N16R8 (16MB flash + PSRAM octal). Kalau boardmu N8R8: ganti FlashSize=16M menjadi FlashSize=8M
+      # Kalau PSRAM-nya QSPI (N8R2/N4R2): ganti PSRAM=opi menjadi PSRAM=enabled
+      - name: Compile
         run: |
           arduino-cli compile \
-            --fqbn "esp32:esp32:esp32s3:CDCOnBoot=cdc,FlashSize=8M,PartitionScheme=huge_app,PSRAM=opi,CPUFreq=240,DebugLevel=none" \
-            --output-dir ./build \
-            --warnings default \
-            DEWZX_VOICE_AI/
+            --fqbn "esp32:esp32:esp32s3:PSRAM=opi,FlashSize=16M,PartitionScheme=default_8MB,CDCOnBoot=default" \
+            --output-dir build \
+            DEWZX_VOICE_AI
 
-      - name: Upload firmware as artifact
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
-          name: DEWZX-firmware-${{ github.sha }}
-          path: |
-            build/*.bin
-            build/*.elf
-          retention-days: 30
+          name: DEWZX-firmware
+          path: build/*.bin
