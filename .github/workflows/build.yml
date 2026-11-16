@@ -3,23 +3,21 @@ name: Build DEWZX Firmware
 on:
   push:
     branches: [main, master]
-  pull_request:
   workflow_dispatch:
 
 env:
-  SKETCH_DIR: DEWZX_VOICE_AI                 # folder sketch (harus sama dengan nama file .ino -> DEWZX/DEWZX.ino)
-  ESP32_CORE: 2.0.17                # core lama, kompatibel dengan driver/i2s.h legacy
-  FQBN: esp32:esp32:esp32s3:PSRAM=opi,FlashSize=8M,PartitionScheme=huge_app,CPUFreq=240,CDCOnBoot=cdc
+  SKETCH_DIR: DEWZX_VOICE_AI
+  SKETCH_NAME: DEWZX_VOICE_AI
+  ESP32_CORE: 2.0.17
+  FQBN: esp32:esp32:esp32s3:PSRAM=opi,FlashSize=8M,PartitionScheme=huge_app,CPUFreq=240,CDCOnBoot=cdc,FlashMode=qio
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Arduino CLI
-        uses: arduino/setup-arduino-cli@v2
+      - uses: arduino/setup-arduino-cli@v2
 
       - name: Install ESP32 core
         run: |
@@ -38,19 +36,32 @@ jobs:
         run: |
           arduino-cli compile \
             --fqbn "${FQBN}" \
-            --export-binaries \
-            --warnings default \
+            --output-dir build_out \
             "${SKETCH_DIR}"
+          ls -lh build_out
 
-      - name: Kumpulkan hasil
+      - name: Buat merged.bin (8MB, siap flash di 0x0)
         run: |
-          mkdir -p out
-          cp ${SKETCH_DIR}/build/*/*.bin out/
-          ls -lh out
+          pip install esptool
+          BOOT=$(find ~/.arduino15 -name boot_app0.bin | head -1)
+          python -m esptool --chip esp32s3 merge_bin \
+            -o build_out/DEWZX_merged_8MB.bin \
+            --flash_mode qio --flash_freq 80m --flash_size 8MB \
+            --fill-flash-size 8MB \
+            0x0     build_out/${SKETCH_NAME}.ino.bootloader.bin \
+            0x8000  build_out/${SKETCH_NAME}.ino.partitions.bin \
+            0xe000  "$BOOT" \
+            0x10000 build_out/${SKETCH_NAME}.ino.bin
+          ls -lh build_out/DEWZX_merged_8MB.bin
 
       - name: Upload firmware
         uses: actions/upload-artifact@v4
         with:
           name: dewzx-firmware
-          path: out/*.bin
+          path: |
+            build_out/DEWZX_merged_8MB.bin
+            build_out/${{ env.SKETCH_NAME }}.ino.bin
+            build_out/${{ env.SKETCH_NAME }}.ino.bootloader.bin
+            build_out/${{ env.SKETCH_NAME }}.ino.partitions.bin
+
 
