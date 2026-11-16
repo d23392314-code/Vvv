@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 env:
-  SKETCH_DIR: DEWZX                 # folder sketch (harus sama dengan nama file .ino -> DEWZX/DEWZX.ino)
+  SKETCH_DIR: DEWZX_VOICE_AI                 # folder sketch (harus sama dengan nama file .ino -> DEWZX/DEWZX.ino)
   ESP32_CORE: 2.0.17                # core lama, kompatibel dengan driver/i2s.h legacy
   FQBN: esp32:esp32:esp32s3:PSRAM=opi,FlashSize=8M,PartitionScheme=huge_app,CPUFreq=240,CDCOnBoot=cdc
 
